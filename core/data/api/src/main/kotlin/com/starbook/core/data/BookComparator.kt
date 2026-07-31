@@ -1,0 +1,18 @@
+package com.starbook.core.data
+
+import com.starbook.core.common.comparator.NaturalOrderComparator
+
+public enum class BookComparator(private val comparatorFunction: Comparator<Book>) : Comparator<Book> by comparatorFunction {
+
+  ByLastPlayed(
+    compareByDescending {
+      it.content.lastPlayedAt
+    },
+  ),
+  ByName(
+    Comparator { left, right ->
+      NaturalOrderComparator.stringComparator.compare(left.content.name, right.content.name)
+    },
+  ),
+}
+

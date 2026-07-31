@@ -1,0 +1,9 @@
+plugins {
+  id("com.starbook.library")
+  alias(libs.plugins.metro)
+}
+
+dependencies {
+  implementation(projects.core.initializer)
+  implementation(projects.core.common)
+}

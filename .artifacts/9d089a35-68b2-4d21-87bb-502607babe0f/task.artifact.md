@@ -1,0 +1,3 @@
+- [x] Update `gradle.properties` with new version name
+- [x] Run Gradle Sync
+- [x] Deploy the app to the physical device

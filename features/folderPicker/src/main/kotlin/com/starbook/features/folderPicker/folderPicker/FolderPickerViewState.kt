@@ -1,0 +1,21 @@
+package com.starbook.features.folderPicker.folderPicker
+
+import android.net.Uri
+import com.starbook.core.data.folders.FolderType
+
+data class FolderPickerViewState(
+  val items: List<Item>,
+  val showActions: Boolean = true,
+) {
+
+  data class Item(
+    val name: String,
+    val id: Uri,
+    val folderType: FolderType,
+  ) : Comparable<Item> {
+    override fun compareTo(other: Item): Int {
+      return compareValuesBy(this, other, { it.folderType }, { it.name })
+    }
+  }
+}
+

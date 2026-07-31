@@ -1,0 +1,12 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut
+    android:icon="@drawable/ic_shortcut_play"
+    android:shortcutId="playCurrent"
+    android:shortcutShortLabel="@string/shortcut.play_current.short_label">
+    <intent
+      android:action="playCurrent"
+      android:targetClass="com.starbook.app.MainActivity"
+      android:targetPackage="com.starbook.audio" />
+  </shortcut>
+</shortcuts>
+
