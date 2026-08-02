@@ -94,10 +94,10 @@ fun CreditsScreen() {
 
       item {
         CreditSection(
-          title = "Original App",
-          description = "StarBook is a forked repository of Voice, an excellent open-source audiobook player.",
-          author = "Paul Woitaschek",
-          url = "https://github.com/PaulWoitaschek/Voice",
+          title = "StarBook",
+          description = "A modern, privacy-first audiobook player for Android.",
+          author = "StarBook Project",
+          url = "https://github.com/monomixs/StarBook",
           onUrlClick = { viewModel.openUrl(it) },
           accentColor = Color(0xFFB7C4FF)
         )
