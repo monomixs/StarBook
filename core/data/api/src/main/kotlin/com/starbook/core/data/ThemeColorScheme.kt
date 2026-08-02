@@ -10,5 +10,20 @@ public enum class ThemeColorScheme {
 
   @SerialName("Dynamic")
   Dynamic,
+
+  @SerialName("Crimson")
+  Crimson,
+
+  @SerialName("Midnight")
+  Midnight,
+
+  @SerialName("Golden")
+  Golden,
+
+  @SerialName("Cyan")
+  Cyan,
+
+  @SerialName("Lime")
+  Lime,
 }
 

@@ -1,6 +1,6 @@
 package com.starbook.features.bookOverview.views
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,12 +21,13 @@ import com.starbook.core.ui.WaveProgressBar
 import com.starbook.core.ui.icons.StarBookIcons
 import com.starbook.features.bookOverview.overview.StatsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
   stats: StatsViewModel.StatsViewState,
   onBookClick: (String) -> Unit,
-  onSettingsClick: () -> Unit
+  onBookLongClick: (String) -> Unit,
+  onSettingsClick: () -> Unit,
 ) {
   Scaffold(
     containerColor = Color.Transparent,
@@ -44,7 +45,8 @@ fun HomeScreen(
             Text(
               text = "Your listening",
               style = MaterialTheme.typography.headlineMedium,
-              fontWeight = FontWeight.ExtraBold
+              fontWeight = FontWeight.ExtraBold,
+              color = MaterialTheme.colorScheme.onSurface
             )
           }
         },
@@ -64,7 +66,7 @@ fun HomeScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding),
-      contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 220.dp),
+      contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 105.dp),
       verticalArrangement = Arrangement.spacedBy(30.dp)
     ) {
       // Hero Card
@@ -75,7 +77,7 @@ fun HomeScreen(
       // Continue Listening (2xN Grid Flow)
       if (stats.inProgressBooks.isNotEmpty()) {
         item(key = "continue_title") {
-          SectionTitle("Continue listening")
+          SectionTitle("Continue Listening")
 
           val bookChunks = remember(stats.inProgressBooks) {
             stats.inProgressBooks.chunked(2)
@@ -91,6 +93,7 @@ fun HomeScreen(
                   HomeListBookRow(
                     book = book,
                     onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick,
                     modifier = Modifier.width(300.dp)
                   )
                 }
@@ -106,10 +109,10 @@ fun HomeScreen(
       // Hours per audiobook
       if (stats.topByHours.isNotEmpty()) {
         item(key = "hours_title") {
-          SectionTitle("Hours per audiobook")
+          SectionTitle("Hours Per Audiobook")
           Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val maxHours = remember(stats.topByHours) {
-              stats.topByHours.maxOfOrNull { it.listenedHours + it.listenedMinutes / 60f } ?: 1f
+              stats.topByHours.maxOfOrNull { it.listenedHours + (it.listenedMinutes / 60f) } ?: 1f
             }
             stats.topByHours.forEach { book ->
               HoursRow(book, maxHours)
@@ -121,19 +124,21 @@ fun HomeScreen(
       // Most listened authors
       if (stats.topAuthors.isNotEmpty()) {
         item(key = "authors_title") {
-          SectionTitle("Most listened authors")
-          LazyRow(
+          SectionTitle("Most Listened Authors")
+          FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            maxItemsInEachRow = Int.MAX_VALUE
           ) {
-            items(stats.topAuthors, key = { it.name }) { author ->
+            stats.topAuthors.forEach { author ->
               AuthorChip(author)
             }
           }
         }
       }
 
-      item { Spacer(Modifier.height(100.dp)) }
+      item { Spacer(Modifier.height(20.dp)) }
     }
   }
 }
@@ -196,21 +201,33 @@ private fun HeroCard(stats: StatsViewModel.StatsViewState) {
 
 @Composable
 private fun SectionTitle(title: String) {
-  Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 14.dp))
+  Text(
+    text = title,
+    style = MaterialTheme.typography.titleMedium,
+    fontWeight = FontWeight.Bold,
+    modifier = Modifier.padding(bottom = 14.dp),
+    color = MaterialTheme.colorScheme.onSurface
+  )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HomeListBookRow(
   book: StatsViewModel.BookStat,
   onBookClick: (String) -> Unit,
+  onBookLongClick: (String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   Surface(
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
     shape = RoundedCornerShape(20.dp),
     shadowElevation = 4.dp,
-    onClick = { onBookClick(book.id) },
-    modifier = modifier.clip(RoundedCornerShape(20.dp))
+    modifier = modifier
+        .clip(RoundedCornerShape(20.dp))
+        .combinedClickable(
+            onClick = { onBookClick(book.id) },
+            onLongClick = { onBookLongClick(book.id) }
+        )
   ) {
     Row(
       modifier = Modifier.padding(12.dp),
@@ -268,49 +285,99 @@ private fun HomeListBookRow(
 
 @Composable
 private fun HoursRow(book: StatsViewModel.BookStat, maxHours: Float) {
+  val isDark = isSystemInDarkTheme()
   Column {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.Bottom
     ) {
-      Text(text = book.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+      Text(
+        text = book.title,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.weight(1f),
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        color = MaterialTheme.colorScheme.onSurface
+      )
       val timeText = buildString {
         if (book.listenedHours > 0) append("${book.listenedHours}h ")
         append("${book.listenedMinutes}m")
       }
-      Text(text = timeText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+      Text(
+        text = timeText,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
+      )
     }
-    Spacer(Modifier.height(6.dp))
+    Spacer(Modifier.height(8.dp))
     val currentTotalHours = book.listenedHours + (book.listenedMinutes / 60f)
     val widthFactor = (currentTotalHours / maxHours).coerceAtLeast(0.06f).coerceAtMost(1f)
-    Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)) {
-      Box(modifier = Modifier.fillMaxWidth(widthFactor).fillMaxHeight().background(MaterialTheme.colorScheme.primary, CircleShape))
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(10.dp)
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
+    ) {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth(widthFactor)
+          .fillMaxHeight()
+          .background(
+            if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
+            CircleShape
+          )
+      )
     }
   }
 }
 
 @Composable
 private fun AuthorChip(author: StatsViewModel.AuthorStat) {
-  Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+  val isDark = isSystemInDarkTheme()
+  Column(
+    horizontalAlignment = Alignment.CenterHorizontally,
+    modifier = Modifier.width(100.dp),
+    verticalArrangement = Arrangement.spacedBy(7.dp)
+  ) {
     Box(
-      modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(20.dp)),
+      modifier = Modifier
+        .size(72.dp)
+        .background(
+          if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.primaryContainer,
+          RoundedCornerShape(24.dp)
+        ),
       contentAlignment = Alignment.Center
     ) {
       Icon(
         imageVector = StarBookIcons.Person,
         contentDescription = null,
-        modifier = Modifier.size(32.dp),
-        tint = MaterialTheme.colorScheme.onPrimaryContainer
+        modifier = Modifier.size(48.dp),
+        tint = if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
       )
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      Text(text = author.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+      Text(
+        text = author.name,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        maxLines = 2,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurface
+      )
       val timeText = buildString {
         if (author.listenedHours > 0) append("${author.listenedHours}h ")
         append("${author.listenedMinutes}m")
       }
-      Text(text = timeText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      Text(
+        text = timeText,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
     }
   }
 }

@@ -128,7 +128,6 @@ class MainActivity : AppCompatActivity() {
       ) {
         val bottomSheetStrategy = remember { BottomSheetSceneStrategy<Destination.Compose>() }
         val dialogStrategy = remember { DialogSceneStrategy<Destination.Compose>() }
-        val density = LocalDensity.current
 
         val currentDestination = backStack.lastOrNull()
         val isOverlay = currentDestination != null &&
@@ -181,46 +180,18 @@ class MainActivity : AppCompatActivity() {
                     val initialTabIndex = initial?.tabIndex() ?: -1
                     val targetTabIndex = target?.tabIndex() ?: -1
 
-                    when {
-                      isBookOverviewPlaybackTransition(initial, target) -> {
-                        SharedZAxisEnterTransition togetherWith SharedZAxisExitTransition
-                      }
-                      initialTabIndex != -1 && targetTabIndex != -1 -> {
-                         val forward = targetTabIndex > initialTabIndex
-                         TabEnterTransition(forward) togetherWith TabExitTransition(forward)
-                      }
-                      target is Destination.Settings || target is Destination.DeveloperSettings -> {
-                        PixelPlayerEnterTransition togetherWith PixelPlayerExitTransition
-                      }
-                      initial is Destination.Settings || initial is Destination.DeveloperSettings -> {
-                        PixelPlayerPopEnterTransition togetherWith PixelPlayerPopExitTransition
-                      }
-                      else -> {
-                        SharedXAxisEnterTransition(density) togetherWith SharedXAxisExitTransition(density)
-                      }
+                    val forward = when {
+                      initialTabIndex != -1 && targetTabIndex != -1 -> targetTabIndex > initialTabIndex
+                      else -> true
                     }
+
+                    StarBookEnterTransition(forward) togetherWith StarBookExitTransition(forward)
                   },
                   popTransitionSpec = {
-                    val initial = initialState.destination()
-                    when {
-                      initial is Destination.Settings || initial is Destination.DeveloperSettings -> {
-                        PixelPlayerPopEnterTransition togetherWith PixelPlayerPopExitTransition
-                      }
-                      else -> {
-                        SharedZAxisEnterTransition togetherWith SharedZAxisExitTransition
-                      }
-                    }
+                    StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
                   },
                   predictivePopTransitionSpec = {
-                    val initial = initialState.destination()
-                    when {
-                      initial is Destination.Settings || initial is Destination.DeveloperSettings -> {
-                        PixelPlayerPopEnterTransition togetherWith PixelPlayerPopExitTransition
-                      }
-                      else -> {
-                        SharedZAxisEnterTransition togetherWith SharedZAxisExitTransition
-                      }
-                    }
+                    StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
                   },
                   onBack = {
                     if (backStack.size > 1) {

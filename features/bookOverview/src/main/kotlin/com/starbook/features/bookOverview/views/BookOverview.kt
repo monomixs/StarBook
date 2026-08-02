@@ -106,6 +106,10 @@ fun BookOverviewScreen(
       HomeScreen(
         stats = statsState,
         onBookClick = { bookOverviewViewModel.onBookClick(BookId(it)) },
+        onBookLongClick = { bookId ->
+            bottomSheetViewModel.bookSelected(BookId(bookId))
+            showBottomSheet = true
+        },
         onSettingsClick = bookOverviewViewModel::onSettingsClick
       )
     }
@@ -117,6 +121,10 @@ fun BookOverviewScreen(
         query = searchViewModel.query,
         onQueryChange = searchViewModel::onQueryChange,
         onBookClick = searchViewModel::onBookClick,
+        onBookLongClick = { bookId ->
+            bottomSheetViewModel.bookSelected(bookId)
+            showBottomSheet = true
+        },
         onSettingsClick = bookOverviewViewModel::onSettingsClick
       )
     }
@@ -223,6 +231,7 @@ internal fun BookOverview(
         onActiveChange = onSearchActiveChange,
         onQueryChange = onSearchQueryChange,
         onSearchBookClick = onSearchBookClick,
+        onSearchBookLongClick = onBookLongClick,
       )
     },
     contentWindowInsets = WindowInsets(0, 0, 0, 0),

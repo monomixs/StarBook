@@ -221,6 +221,11 @@ private fun ThemeColorScheme.label(): String {
   return when (this) {
     ThemeColorScheme.StarBookBlue -> stringResource(StringsR.string.settings_appearance_color_scheme_starbook_blue)
     ThemeColorScheme.Dynamic -> stringResource(StringsR.string.settings_appearance_color_scheme_dynamic)
+    ThemeColorScheme.Crimson -> "Crimson"
+    ThemeColorScheme.Midnight -> "Midnight"
+    ThemeColorScheme.Golden -> "Golden"
+    ThemeColorScheme.Cyan -> "Cyan"
+    ThemeColorScheme.Lime -> "Lime"
   }
 }
 
@@ -229,6 +234,11 @@ private fun ThemeColorScheme.supportingText(): String? {
   return when (this) {
     ThemeColorScheme.StarBookBlue -> null
     ThemeColorScheme.Dynamic -> stringResource(StringsR.string.settings_appearance_color_scheme_dynamic_summary)
+    ThemeColorScheme.Crimson -> "Bold Red"
+    ThemeColorScheme.Midnight -> "Deep Slate"
+    ThemeColorScheme.Golden -> "Warm Amber"
+    ThemeColorScheme.Cyan -> "Bright Ocean"
+    ThemeColorScheme.Lime -> "Fresh Green"
   }
 }
 

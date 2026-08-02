@@ -21,6 +21,21 @@ import com.starbook.core.data.ThemeMode
 
 val StarBookBlue = Color(0xFF003b7f)
 
+val CrimsonPrimary = Color(0xFFDC2626)
+val CrimsonSecondary = Color(0xFFFEE2E2)
+
+val MidnightPrimary = Color(0xFF334155)
+val MidnightSecondary = Color(0xFFE2E8F0)
+
+val GoldenPrimary = Color(0xFFF59E0B)
+val GoldenSecondary = Color(0xFFFEF3C7)
+
+val CyanPrimary = Color(0xFF06B6D4)
+val CyanSecondary = Color(0xFFCFFAFE)
+
+val LimePrimary = Color(0xFF65A30D)
+val LimeSecondary = Color(0xFFECFCCB)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StarBookTheme(
@@ -38,21 +53,35 @@ fun StarBookTheme(
       content()
     }
   }
-  if (themeColorScheme == ThemeColorScheme.Dynamic && Build.VERSION.SDK_INT >= 31) {
-    MaterialExpressiveTheme(
-      colorScheme = systemDynamicColorScheme(darkTheme),
-    ) {
-      themedContent()
+
+  when {
+    themeColorScheme == ThemeColorScheme.Dynamic && Build.VERSION.SDK_INT >= 31 -> {
+      MaterialExpressiveTheme(
+        colorScheme = systemDynamicColorScheme(darkTheme),
+      ) {
+        themedContent()
+      }
     }
-  } else {
-    DynamicMaterialExpressiveTheme(
-      primary = StarBookBlue,
-      secondary = Color(0xFF5E6F95),
-      isDark = darkTheme,
-      style = PaletteStyle.Expressive,
-      specVersion = ColorSpec.SpecVersion.SPEC_2025,
-    ) {
-      themedContent()
+    else -> {
+      val (primary, secondary) = when (themeColorScheme) {
+        ThemeColorScheme.StarBookBlue -> StarBookBlue to Color(0xFF5E6F95)
+        ThemeColorScheme.Crimson -> CrimsonPrimary to CrimsonSecondary
+        ThemeColorScheme.Midnight -> MidnightPrimary to MidnightSecondary
+        ThemeColorScheme.Golden -> GoldenPrimary to GoldenSecondary
+        ThemeColorScheme.Cyan -> CyanPrimary to CyanSecondary
+        ThemeColorScheme.Lime -> LimePrimary to LimeSecondary
+        ThemeColorScheme.Dynamic -> StarBookBlue to Color(0xFF5E6F95)
+      }
+
+      DynamicMaterialExpressiveTheme(
+        primary = primary,
+        secondary = secondary,
+        isDark = darkTheme,
+        style = PaletteStyle.Expressive,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
+      ) {
+        themedContent()
+      }
     }
   }
 }

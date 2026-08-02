@@ -13,6 +13,7 @@ dependencies {
 
   implementation(libs.slf4j.noop)
   implementation(libs.jebml)
+  implementation(libs.jaudiotagger)
   implementation(libs.androidxCore)
   implementation(libs.documentFile)
   implementation(libs.media3.inspector)

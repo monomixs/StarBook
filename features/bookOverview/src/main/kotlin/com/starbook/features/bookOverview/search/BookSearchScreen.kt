@@ -65,6 +65,7 @@ fun BookSearchScreen(
     query: String,
     onQueryChange: (String) -> Unit,
     onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit,
     onSettingsClick: () -> Unit
 ) {
     val isSearching = query.isNotBlank()
@@ -82,6 +83,7 @@ fun BookSearchScreen(
             viewState = viewState,
             onQueryChange = onQueryChange,
             onBookClick = onBookClick,
+            onBookLongClick = onBookLongClick,
             modifier = Modifier.padding(padding)
         )
     }
@@ -92,6 +94,7 @@ fun BookSearchContent(
     viewState: BookSearchViewState,
     onQueryChange: (String) -> Unit,
     onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
@@ -114,12 +117,14 @@ fun BookSearchContent(
                 SearchResultsList(
                     viewState = viewState,
                     query = viewState.query,
-                    onBookClick = onBookClick
+                    onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick
                 )
             } else {
                 ExploreShelf(
                     viewState = viewState,
-                    onBookClick = onBookClick
+                    onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick
                 )
             }
         }
@@ -250,7 +255,8 @@ private fun SearchBar(
 @Composable
 private fun ExploreShelf(
     viewState: BookSearchViewState,
-    onBookClick: (BookId) -> Unit
+    onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit
 ) {
     var selectedCategory by remember { mutableStateOf<BookOverviewCategory?>(null) }
     val categories = remember {
@@ -311,7 +317,7 @@ private fun ExploreShelf(
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     itemsIndexed(continueBooks, key = { _, book -> book.id.value }) { index, book ->
-                        ContinueCard(book, index, onBookClick)
+                        ContinueCard(book, index, onBookClick, onBookLongClick)
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -336,7 +342,7 @@ private fun ExploreShelf(
                     val absoluteIndex = rowIndex * 2 + colIndex
                     key(book.id.value) {
                         Box(modifier = Modifier.weight(1f)) {
-                            DiscoverCard(book, absoluteIndex, onBookClick)
+                            DiscoverCard(book, absoluteIndex, onBookClick, onBookLongClick)
                         }
                     }
                 }
@@ -352,7 +358,8 @@ private fun ExploreShelf(
 private fun SearchResultsList(
     viewState: BookSearchViewState,
     query: String,
-    onBookClick: (BookId) -> Unit
+    onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit
 ) {
     val books = (viewState as? BookSearchViewState.SearchResults)?.books ?: emptyList()
     val highlightColor = MaterialTheme.colorScheme.primaryContainer
@@ -380,7 +387,7 @@ private fun SearchResultsList(
             }
 
             itemsIndexed(books, key = { _, book -> book.id.value }) { index, book ->
-                ResultRow(book, index, query, highlightColor, onHighlightColor, onBookClick)
+                ResultRow(book, index, query, highlightColor, onHighlightColor, onBookClick, onBookLongClick)
             }
         }
     }
@@ -413,21 +420,24 @@ private fun StaggeredEntrance(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContinueCard(
     book: BookOverviewItemViewState,
     index: Int,
-    onBookClick: (BookId) -> Unit
+    onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit
 ) {
     StaggeredEntrance(index = index) {
         val appearance = remember(index) { CoverAppearance.get(index) }
         Column(
             modifier = Modifier
                 .width(132.dp)
-                .clickable(
+                .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = { onBookClick(book.id) }
+                    onClick = { onBookClick(book.id) },
+                    onLongClick = { onBookLongClick(book.id) }
                 )
         ) {
             AsymmetricBookCover(
@@ -470,21 +480,24 @@ private fun ContinueCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DiscoverCard(
     book: BookOverviewItemViewState,
     index: Int,
-    onBookClick: (BookId) -> Unit
+    onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit
 ) {
     StaggeredEntrance(index = index) {
         val appearance = remember(index) { CoverAppearance.get(index) }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(
+                .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = { onBookClick(book.id) }
+                    onClick = { onBookClick(book.id) },
+                    onLongClick = { onBookLongClick(book.id) }
                 )
         ) {
             AsymmetricBookCover(
@@ -513,6 +526,7 @@ private fun DiscoverCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ResultRow(
     book: BookOverviewItemViewState,
@@ -520,7 +534,8 @@ private fun ResultRow(
     query: String,
     highlightColor: Color,
     onHighlightColor: Color,
-    onBookClick: (BookId) -> Unit
+    onBookClick: (BookId) -> Unit,
+    onBookLongClick: (BookId) -> Unit
 ) {
     StaggeredEntrance(index = index) {
         val appearance = remember(index) { CoverAppearance.get(index) }
@@ -528,7 +543,10 @@ private fun ResultRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onBookClick(book.id) }
+                .combinedClickable(
+                    onClick = { onBookClick(book.id) },
+                    onLongClick = { onBookLongClick(book.id) }
+                )
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -814,6 +832,7 @@ fun BookSearchScreenPreview() {
             query = "",
             onQueryChange = {},
             onBookClick = {},
+            onBookLongClick = {},
             onSettingsClick = {}
         )
     }
