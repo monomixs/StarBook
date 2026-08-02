@@ -3,6 +3,7 @@
   <issue id="Typos" severity="informational" />
   <issue id="TypographyEllipsis" severity="informational" />
   <issue id="MissingTranslation" severity="informational" />
+  <!-- https://github.com/WeblateOrg/weblate/issues/7520 -->
   <issue id="MissingQuantity">
     <ignore regexp=".*?French.*?many" />
     <ignore regexp=".*?Slovak.*?many" />
@@ -14,6 +15,7 @@
   <issue id="VectorPath" severity="informational" />
   <issue id="UnusedResources" severity="error" />
   <issue id="NewerVersionAvailable" severity="informational" />
+  <!-- renovate takes care of this -->
   <issue id="GradleDependency" severity="ignore" />
   <issue id="AndroidGradlePluginVersion" severity="informational" />
   <issue id="UnusedQuantity" severity="informational" />
