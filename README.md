@@ -10,10 +10,7 @@ StarBook is designed to make listening to local audiobooks simple, beautiful, an
 # Screenshots
 
 <p align="center">
-  <img src="screenshots/Player.jpg" width="23%" />
-  <img src="screenshots/Home.jpg" width="23%" />
-  <img src="screenshots/Search.jpg" width="23%" />
-  <img src="screenshots/Library.jpg" width="23%" />
+  <img src="screenshots/Pictures.png" width="100%" />
 </p>
 
 ---
