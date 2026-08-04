@@ -9,14 +9,19 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
@@ -28,24 +33,28 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.util.lerp
 import com.starbook.features.playbackScreen.pixelplayer.UnifiedPlayerSheetV2
 import com.starbook.features.playbackScreen.pixelplayer.PixelPlayerViewModel
 import com.starbook.features.playbackScreen.pixelplayer.PlayerSheetState
 import com.starbook.features.playbackScreen.pixelplayer.components.AppBottomNavigation
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
@@ -62,10 +71,14 @@ import com.starbook.core.data.store.ThemeModeStore
 import com.starbook.core.logging.api.Logger
 import com.starbook.core.ui.LocalSharedTransitionScope
 import com.starbook.core.ui.StarBookTheme
+import com.starbook.core.ui.GlobalLoadingState
+import com.starbook.core.ui.LoadingOverlay
 import com.starbook.features.review.ReviewFeature
 import com.starbook.navigation.Destination
 import com.starbook.navigation.NavigationCommand
 import com.starbook.navigation.Navigator
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 @ContributesTo(AppScope::class)
 interface MainActivityGraph {
@@ -88,6 +101,12 @@ class MainActivity : AppCompatActivity() {
 
   @Inject
   private lateinit var pixelPlayerViewModel: PixelPlayerViewModel
+
+  @Inject
+  private lateinit var mediaScanTrigger: com.starbook.core.scanner.MediaScanTrigger
+
+  @Inject
+  private lateinit var globalLoadingState: GlobalLoadingState
 
   @Inject
   @ThemeModeStore
@@ -130,14 +149,19 @@ class MainActivity : AppCompatActivity() {
         val dialogStrategy = remember { DialogSceneStrategy<Destination.Compose>() }
 
         val currentDestination = backStack.lastOrNull()
-        val isOverlay = currentDestination != null &&
-          currentDestination !is Destination.Home &&
-          currentDestination !is Destination.Search &&
-          currentDestination !is Destination.BookOverview &&
-          currentDestination !is Destination.Playback
-
         val sheetState by pixelPlayerViewModel.sheetState.collectAsState()
         val stablePlayerState by pixelPlayerViewModel.stablePlayerState.collectAsState()
+
+        val isScanningRaw by mediaScanTrigger.scannerActive.collectAsState(false)
+        val isGlobalLoading by globalLoadingState.isShowing.collectAsState()
+
+        var isScanning by remember { mutableStateOf(false) }
+        LaunchedEffect(isScanningRaw) {
+            if (isScanningRaw) {
+                kotlinx.coroutines.delay(600)
+            }
+            isScanning = isScanningRaw
+        }
 
         val selectedTab = remember(currentDestination) {
             when (currentDestination) {
@@ -148,13 +172,39 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fun Destination.Compose.tabIndex(): Int {
-          return when (this) {
-            is Destination.Home -> 0
-            is Destination.Search -> 1
-            is Destination.BookOverview -> 2
-            else -> -1
-          }
+        val mainTabs = remember {
+            listOf(Destination.Home, Destination.Search, Destination.BookOverview)
+        }
+        val pagerState = rememberPagerState(
+            initialPage = 0,
+            pageCount = { mainTabs.size }
+        )
+        val coroutineScope = rememberCoroutineScope()
+
+        LaunchedEffect(currentDestination) {
+            val index = mainTabs.indexOfFirst { it::class == currentDestination?.let { it::class } }
+            if (index != -1 && index != pagerState.currentPage) {
+                pagerState.animateScrollToPage(
+                    page = index,
+                    animationSpec = spring(
+                        dampingRatio = 0.65f,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+            }
+        }
+
+        LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+            if (!pagerState.isScrollInProgress) {
+                val targetDest = mainTabs[pagerState.currentPage]
+                if (currentDestination?.let { it::class } != targetDest::class) {
+                    backStack.clear()
+                    backStack.add(Destination.Home)
+                    if (targetDest != Destination.Home) {
+                        backStack.add(targetDest)
+                    }
+                }
+            }
         }
 
         Box(
@@ -162,55 +212,75 @@ class MainActivity : AppCompatActivity() {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
         ) {
-          // Layer 0 or 2: Navigation Content
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .zIndex(if (isOverlay) 2f else 0f)
-          ) {
-            SharedTransitionLayout {
-              CompositionLocalProvider(LocalSharedTransitionScope provides this) {
-                NavDisplay(
-                  backStack = backStack,
-                  sceneStrategies = listOf(bottomSheetStrategy, dialogStrategy),
-                  sharedTransitionScope = this,
-                  transitionSpec = {
-                    val initial = initialState.destination()
-                    val target = targetState.destination()
-                    val initialTabIndex = initial?.tabIndex() ?: -1
-                    val targetTabIndex = target?.tabIndex() ?: -1
+          HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
+            userScrollEnabled = currentDestination in mainTabs
+          ) { page ->
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                  val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
+                  val settle = 1f - pageOffset.coerceIn(0f, 1f)
 
-                    val forward = when {
-                      initialTabIndex != -1 && targetTabIndex != -1 -> targetTabIndex > initialTabIndex
-                      else -> true
-                    }
-
-                    StarBookEnterTransition(forward) togetherWith StarBookExitTransition(forward)
-                  },
-                  popTransitionSpec = {
-                    StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
-                  },
-                  predictivePopTransitionSpec = {
-                    StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
-                  },
-                  onBack = {
-                    if (backStack.size > 1) {
-                      backStack.removeLastOrNull()
-                    }
-                  },
-                  entryProvider = { key ->
-                    navEntryResolver.create(key)
-                  },
-                )
+                  val scale = lerp(0.94f, 1f, settle)
+                  scaleX = scale
+                  scaleY = scale
+                  alpha = lerp(0.4f, 1f, settle)
+                }
+            ) {
+              when (page) {
+                0 -> com.starbook.features.bookOverview.views.BookOverviewScreen(Destination.Tab.HOME)
+                1 -> com.starbook.features.bookOverview.views.BookOverviewScreen(Destination.Tab.SEARCH)
+                2 -> com.starbook.features.bookOverview.views.BookOverviewScreen(Destination.Tab.LIBRARY)
               }
             }
           }
 
-          // Layer 1: Persistent UI (Navbar + Player)
+          val isTabActive = currentDestination in mainTabs
+          if (!isTabActive) {
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .zIndex(2f)
+                .background(MaterialTheme.colorScheme.background)
+            ) {
+              SharedTransitionLayout {
+                CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                  NavDisplay(
+                    backStack = backStack,
+                    sceneStrategies = listOf(bottomSheetStrategy, dialogStrategy),
+                    sharedTransitionScope = this,
+                    transitionSpec = {
+                      val forward = true
+                      StarBookEnterTransition(forward) togetherWith StarBookExitTransition(forward)
+                    },
+                    popTransitionSpec = {
+                      StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
+                    },
+                    predictivePopTransitionSpec = {
+                      StarBookEnterTransition(false) togetherWith StarBookExitTransition(false)
+                    },
+                    onBack = {
+                      if (backStack.size > 1) {
+                        backStack.removeLastOrNull()
+                      }
+                    },
+                    entryProvider = { key ->
+                      navEntryResolver.create(key)
+                    },
+                  )
+                }
+              }
+            }
+          }
+
           BoxWithConstraints(
             modifier = Modifier
               .fillMaxSize()
-              .zIndex(1f)
+              .zIndex(3f)
           ) {
             val screenHeight = maxHeight
             val miniPlayerHeight = 64.dp
@@ -220,60 +290,56 @@ class MainActivity : AppCompatActivity() {
                                currentDestination is Destination.Search ||
                                currentDestination is Destination.BookOverview
 
-            val bottomNavHeight = if (showBottomNav) 80.dp + 16.dp + navBarPadding else 0.dp
+            val bottomNavHeight = 80.dp + 16.dp + navBarPadding
 
-            // Always render Bottom Navigation if we're on a main screen
-            // but the user wants it to be "still there", so we always render it
-            // but we might want to hide it if we're deeply nested?
-            // "still there but not visible" suggests always in composition.
-            if (showBottomNav) {
+            val persistentUiOffset by animateDpAsState(
+                targetValue = if (showBottomNav) 0.dp else bottomNavHeight + miniPlayerHeight + 20.dp,
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                label = "PersistentUiOffset"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .offset { IntOffset(0, persistentUiOffset.roundToPx()) }
+            ) {
+                val pillFraction by remember {
+                    derivedStateOf { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+                }
                 AppBottomNavigation(
                     selectedTab = selectedTab,
+                    pillPositionFraction = pillFraction,
                     isMiniPlayerActive = stablePlayerState.currentSong != null,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     onTabClick = { tab ->
-                        if (selectedTab != tab) {
-                            when (tab) {
-                                Destination.Tab.HOME -> {
-                                    backStack.clear()
-                                    backStack.add(Destination.Home)
-                                }
-                                Destination.Tab.SEARCH -> {
-                                    backStack.clear()
-                                    backStack.add(Destination.Home)
-                                    backStack.add(Destination.Search)
-                                }
-                                Destination.Tab.LIBRARY -> {
-                                    backStack.clear()
-                                    backStack.add(Destination.Home)
-                                    backStack.add(Destination.BookOverview)
-                                }
-                            }
+                        val targetIndex = when (tab) {
+                            Destination.Tab.HOME -> 0
+                            Destination.Tab.SEARCH -> 1
+                            Destination.Tab.LIBRARY -> 2
+                        }
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(
+                                page = targetIndex,
+                                animationSpec = spring(
+                                    dampingRatio = 0.65f,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
                         }
                     }
                 )
-            }
 
-            val showPlayerSheet = currentDestination !is Destination.Settings &&
-              currentDestination !is Destination.DeveloperSettings &&
-              currentDestination !is Destination.FolderPicker &&
-              currentDestination !is Destination.SelectFolderType &&
-              currentDestination !is Destination.AddContent &&
-              currentDestination !is Destination.MetadataEditor
-
-            if (showPlayerSheet) {
-              UnifiedPlayerSheetV2(
-                playerViewModel = pixelPlayerViewModel,
-                sheetCollapsedTargetY = with(LocalDensity.current) { (screenHeight - miniPlayerHeight - bottomNavHeight - 10.dp).toPx() },
-                containerHeight = screenHeight,
-                onOpenChapters = {
-                  pixelPlayerViewModel.openChapterDialog()
-                },
-              )
+                UnifiedPlayerSheetV2(
+                    playerViewModel = pixelPlayerViewModel,
+                    sheetCollapsedTargetY = with(LocalDensity.current) { (screenHeight - miniPlayerHeight - bottomNavHeight - 10.dp).toPx() },
+                    containerHeight = screenHeight,
+                    onOpenChapters = {
+                      pixelPlayerViewModel.openChapterDialog()
+                    },
+                )
             }
           }
 
-          // Bottom gradient behind everything
           Box(
             modifier = Modifier
               .fillMaxWidth()
@@ -285,6 +351,11 @@ class MainActivity : AppCompatActivity() {
               )
               .align(Alignment.BottomCenter)
               .zIndex(0.5f)
+          )
+
+          LoadingOverlay(
+              isShowing = isScanning || isGlobalLoading,
+              modifier = Modifier.zIndex(100f)
           )
         }
 

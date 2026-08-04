@@ -17,13 +17,13 @@ import com.starbook.app.navigation.DestinationMetadataKey
 import com.starbook.navigation.Destination
 
 private val SpringSpec = spring<Float>(
-  dampingRatio = 0.8f,
-  stiffness = Spring.StiffnessMediumLow
+  dampingRatio = 0.72f,
+  stiffness = Spring.StiffnessMedium
 )
 
 private val SlideSpringSpec = spring<IntOffset>(
-  dampingRatio = 0.8f,
-  stiffness = Spring.StiffnessMediumLow
+  dampingRatio = 0.72f,
+  stiffness = Spring.StiffnessMedium
 )
 
 /**

@@ -1,25 +1,23 @@
 package com.starbook.features.folderPicker.addcontent
 
 import android.net.Uri
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.starbook.features.folderPicker.R
+import com.starbook.core.ui.ChoiceCard
+import com.starbook.core.ui.SetupBackground
+import com.starbook.core.ui.icons.StarBookIcons
 import com.starbook.features.folderPicker.folderPicker.FileTypeSelection
 import com.starbook.navigation.Origin
 import com.starbook.core.strings.R as StringsR
@@ -31,57 +29,112 @@ internal fun SelectFolder(
   origin: Origin,
   modifier: Modifier = Modifier,
 ) {
-  Scaffold(
-    modifier = modifier,
-    topBar = {
-      SelectFolderAppBar(onBack)
-    },
-    content = { contentPadding ->
-      Column(Modifier.padding(contentPadding)) {
-        if (shouldShowImage()) {
-          Image(
+  val isDark = isSystemInDarkTheme()
+  val surfaceColor = if (isDark) Color(0xFF232634) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+  val onSurfaceColor = if (isDark) Color(0xFFECEBF4) else MaterialTheme.colorScheme.onSurface
+  val onSurfaceVarColor = if (isDark) Color(0xFFAFB0C4) else MaterialTheme.colorScheme.onSurfaceVariant
+
+  val fileLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.OpenDocument(),
+    onResult = { uri: Uri? ->
+      if (uri != null) {
+        onAdd(FileTypeSelection.File, uri)
+      }
+    }
+  )
+
+  val folderLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.OpenDocumentTree(),
+    onResult = { uri: Uri? ->
+      if (uri != null) {
+        onAdd(FileTypeSelection.Folder, uri)
+      }
+    }
+  )
+
+  SetupBackground(modifier = modifier) {
+    Scaffold(
+      containerColor = Color.Transparent,
+      topBar = {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp, vertical = 16.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          IconButton(
+            onClick = onBack,
             modifier = Modifier
-              .weight(1F)
-              .heightIn(max = 400.dp)
-              .padding(top = 32.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
-              .align(Alignment.CenterHorizontally),
-            painter = painterResource(id = R.drawable.folder_type_artwork),
-            contentDescription = null,
-          )
-        }
-
-        Column(Modifier.weight(2F)) {
-          Spacer(modifier = Modifier.size(16.dp))
-
-          Text(
-            modifier = Modifier.padding(horizontal = 24.dp),
-            text = stringResource(
-              when (origin) {
-                Origin.Default -> StringsR.string.folder_add_title_default
-                Origin.Onboarding -> StringsR.string.folder_add_title_onboarding
-              },
-            ),
-            style = MaterialTheme.typography.displayMedium,
-          )
-          Spacer(modifier = Modifier.size(4.dp))
-          Text(
-            modifier = Modifier.padding(horizontal = 24.dp),
-            text = stringResource(StringsR.string.folder_add_type_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-          )
-          Spacer(modifier = Modifier.size(24.dp))
-          SelectFolderButtonRow(onAdd)
+              .size(40.dp)
+              .background(surfaceColor, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+          ) {
+            Icon(
+              imageVector = StarBookIcons.ArrowBack,
+              contentDescription = "Back",
+              tint = onSurfaceColor
+            )
+          }
         }
       }
-    },
-  )
-}
+    ) { padding ->
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(padding)
+          .padding(26.dp)
+      ) {
+        Text(
+          text = stringResource(
+            when (origin) {
+              Origin.Default -> StringsR.string.folder_add_title_default
+              Origin.Onboarding -> StringsR.string.folder_add_title_onboarding
+            },
+          ),
+          style = MaterialTheme.typography.headlineLarge,
+          fontWeight = FontWeight.ExtraBold,
+          color = onSurfaceColor
+        )
+        Text(
+          text = stringResource(StringsR.string.folder_add_type_subtitle),
+          style = MaterialTheme.typography.bodyLarge,
+          color = onSurfaceVarColor,
+          modifier = Modifier.padding(top = 14.dp)
+        )
 
-@Composable
-private fun shouldShowImage(): Boolean {
-  val localWindowInfo = LocalWindowInfo.current
-  val thresholdPx = with(LocalDensity.current) { 600.dp.toPx() }
-  return localWindowInfo.containerSize.height > thresholdPx
+        Spacer(Modifier.weight(0.2f))
+
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+          horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+          ChoiceCard(
+            label = "Folder",
+            icon = StarBookIcons.Folder,
+            accentColor = Color(0xFF8FE3C4),
+            containerColor = Color(0xFF1E4C3C),
+            surfaceColor = surfaceColor,
+            onSurfaceColor = onSurfaceColor,
+            onClick = { folderLauncher.launch(null) },
+            modifier = Modifier.weight(1f)
+          )
+          ChoiceCard(
+            label = "File",
+            icon = StarBookIcons.AudioFile,
+            accentColor = Color(0xFF8FE3C4),
+            containerColor = Color(0xFF1E4C3C),
+            surfaceColor = surfaceColor,
+            onSurfaceColor = onSurfaceColor,
+            onClick = { fileLauncher.launch(arrayOf("audio/*")) },
+            modifier = Modifier.weight(1f)
+          )
+        }
+
+        Spacer(Modifier.weight(1f))
+      }
+    }
+  }
 }
 
 @Composable
@@ -93,4 +146,3 @@ private fun SelectFolderPreview() {
     origin = Origin.Default,
   )
 }
-

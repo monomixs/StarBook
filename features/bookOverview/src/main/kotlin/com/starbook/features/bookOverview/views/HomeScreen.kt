@@ -1,34 +1,58 @@
 package com.starbook.features.bookOverview.views
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.starbook.core.ui.WaveProgressBar
 import com.starbook.core.ui.icons.StarBookIcons
 import com.starbook.features.bookOverview.overview.StatsViewModel
+import com.starbook.features.playbackScreen.pixelplayer.components.SmartImage
+import java.time.LocalTime
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
   stats: StatsViewModel.StatsViewState,
   onBookClick: (String) -> Unit,
   onBookLongClick: (String) -> Unit,
   onSettingsClick: () -> Unit,
+  onGoToLibraryClick: () -> Unit,
 ) {
+  var showMoreSheet by remember { mutableStateOf(false) }
+  var showStreakDialog by remember { mutableStateOf(false) }
+
+  if (stats.bookCount == 0 || (stats.todayHours == 0 && stats.todayMinutes == 0 && stats.inProgressBooks.isEmpty())) {
+      EmptyHomeState(onGoToLibraryClick)
+      return
+  }
+
   Scaffold(
     containerColor = Color.Transparent,
     topBar = {
@@ -36,14 +60,13 @@ fun HomeScreen(
         title = {
           Column {
             Text(
-              text = "Good evening",
-              style = MaterialTheme.typography.labelSmall,
+              text = getGreeting() + " 👋",
+              style = MaterialTheme.typography.labelLarge,
               color = MaterialTheme.colorScheme.primary,
-              fontWeight = FontWeight.Bold,
-              letterSpacing = 1.sp
+              fontWeight = FontWeight.Bold
             )
             Text(
-              text = "Your listening",
+              text = "Your Listening",
               style = MaterialTheme.typography.headlineMedium,
               fontWeight = FontWeight.ExtraBold,
               color = MaterialTheme.colorScheme.onSurface
@@ -54,7 +77,8 @@ fun HomeScreen(
            IconButton(onClick = onSettingsClick) {
              Icon(
                imageVector = StarBookIcons.Settings,
-               contentDescription = "Settings"
+               contentDescription = "Settings",
+               tint = MaterialTheme.colorScheme.onSurface
              )
            }
         },
@@ -66,318 +90,494 @@ fun HomeScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding),
-      contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 105.dp),
-      verticalArrangement = Arrangement.spacedBy(30.dp)
+      contentPadding = PaddingValues(start = 26.dp, end = 26.dp, top = 10.dp, bottom = 140.dp),
     ) {
-      // Hero Card
+      // Hero Card (Continue Listening)
       item(key = "hero") {
-        HeroCard(stats)
-      }
-
-      // Continue Listening (2xN Grid Flow)
-      if (stats.inProgressBooks.isNotEmpty()) {
-        item(key = "continue_title") {
-          SectionTitle("Continue Listening")
-
-          val bookChunks = remember(stats.inProgressBooks) {
-            stats.inProgressBooks.chunked(2)
-          }
-
-          LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
-          ) {
-            items(bookChunks) { chunk ->
-              Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                chunk.forEach { book ->
-                  HomeListBookRow(
-                    book = book,
-                    onBookClick = onBookClick,
-                    onBookLongClick = onBookLongClick,
-                    modifier = Modifier.width(300.dp)
-                  )
-                }
-                if (chunk.size == 1) {
-                  Spacer(Modifier.height(80.dp).width(300.dp))
-                }
-              }
-            }
-          }
+        val continueBook = stats.inProgressBooks.firstOrNull() ?: stats.topByHours.firstOrNull()
+        if (continueBook != null) {
+            HeroCard(
+                book = continueBook,
+                onClick = { onBookClick(continueBook.id) }
+            )
+            Spacer(Modifier.height(22.dp))
         }
       }
 
-      // Hours per audiobook
+      // Stats Grid
+      item(key = "stats") {
+        StatsGrid(
+            stats = stats,
+            onStreakClick = { showStreakDialog = true }
+        )
+        Spacer(Modifier.height(30.dp))
+      }
+
+      // Top Books
       if (stats.topByHours.isNotEmpty()) {
-        item(key = "hours_title") {
-          SectionTitle("Hours Per Audiobook")
-          Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            val maxHours = remember(stats.topByHours) {
-              stats.topByHours.maxOfOrNull { it.listenedHours + (it.listenedMinutes / 60f) } ?: 1f
+        item(key = "top_books_title") {
+          SectionTitle("Your Top Books")
+        }
+
+        items(stats.topByHours.take(3), key = { it.id }) { book ->
+            val index = stats.topByHours.indexOf(book)
+            val badgeText = when(index) {
+                0 -> "★ Favorite"
+                1 -> "Top 2"
+                2 -> "Top 3"
+                else -> null
             }
-            stats.topByHours.forEach { book ->
-              HoursRow(book, maxHours)
+            BookStatRow(
+                book = book,
+                badgeText = badgeText,
+                onClick = { onBookClick(book.id) },
+                onLongClick = { onBookLongClick(book.id) }
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+
+        if (stats.recentBooks.size > 3) {
+            item(key = "show_more") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    OutlinedButton(
+                        onClick = { showMoreSheet = true },
+                        shape = RoundedCornerShape(999.dp),
+                        border = BorderStroke(2.dp, Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)))),
+                        modifier = Modifier.height(44.dp).padding(horizontal = 40.dp)
+                    ) {
+                        Text(
+                            "Show more",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(Modifier.height(30.dp))
             }
-          }
         }
       }
 
-      // Most listened authors
+      // Top Authors
       if (stats.topAuthors.isNotEmpty()) {
         item(key = "authors_title") {
-          SectionTitle("Most Listened Authors")
-          FlowRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            maxItemsInEachRow = Int.MAX_VALUE
+          SectionTitle("Top Authors")
+          Row(
+              modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+              horizontalArrangement = Arrangement.spacedBy(18.dp)
           ) {
-            stats.topAuthors.forEach { author ->
-              AuthorChip(author)
-            }
+              stats.topAuthors.forEach { author ->
+                  AuthorCard(author)
+              }
           }
         }
       }
 
-      item { Spacer(Modifier.height(20.dp)) }
+      item { Spacer(Modifier.height(40.dp)) }
     }
+  }
+
+  if (showMoreSheet) {
+    MoreAudiobooksSheet(
+        books = stats.recentBooks,
+        onBookClick = {
+            onBookClick(it)
+            showMoreSheet = false
+        },
+        onDismiss = { showMoreSheet = false }
+    )
+  }
+
+  if (showStreakDialog) {
+      AlertDialog(
+          onDismissRequest = { showStreakDialog = false },
+          title = { Text("Streak", fontWeight = FontWeight.ExtraBold) },
+          text = { Text("Listen to any audiobook for at least 5 minutes a day to increase your streak.") },
+          confirmButton = {
+              TextButton(onClick = { showStreakDialog = false }) {
+                  Text("Got it", fontWeight = FontWeight.Bold)
+              }
+          },
+          shape = RoundedCornerShape(28.dp),
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+      )
   }
 }
 
 @Composable
-private fun HeroCard(stats: StatsViewModel.StatsViewState) {
-  Surface(
-    color = MaterialTheme.colorScheme.primary,
-    contentColor = Color.White,
-    shape = RoundedCornerShape(28.dp),
-    modifier = Modifier.fillMaxWidth()
-  ) {
-    Column(modifier = Modifier.padding(24.dp)) {
-      Text(
-        text = "Total time listened",
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = Color.White.copy(alpha = 0.85f)
-      )
-      Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-          text = stats.totalHours.toString(),
-          style = MaterialTheme.typography.displayMedium,
-          fontWeight = FontWeight.ExtraBold,
-          color = Color.White
-        )
-        Text(
-          text = "hrs",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
-          modifier = Modifier.padding(start = 5.dp, bottom = 8.dp),
-          color = Color.White.copy(alpha = 0.8f)
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-          text = stats.totalMinutes.toString(),
-          style = MaterialTheme.typography.displayMedium,
-          fontWeight = FontWeight.ExtraBold,
-          color = Color.White
-        )
-        Text(
-          text = "mins",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
-          modifier = Modifier.padding(start = 5.dp, bottom = 8.dp),
-          color = Color.White.copy(alpha = 0.8f)
-        )
-      }
-      Text(
-        text = "Across ${stats.bookCount} audiobooks · ${stats.finishedCount} finished",
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Medium,
-        color = Color.White.copy(alpha = 0.85f)
-      )
-      Spacer(Modifier.height(16.dp))
-      WaveProgressBar(progress = 1f, color = Color.White, modifier = Modifier.fillMaxWidth().height(14.dp), strokeWidth = 5f)
+private fun EmptyHomeState(onGoToLibraryClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "No Stats Available",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                "Start Listening to See Your Stats",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onGoToLibraryClick,
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                contentPadding = PaddingValues(horizontal = 50.dp, vertical = 12.dp),
+            ) {
+                Text("Go to library", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+            }
+        }
     }
-  }
+}
+
+@Composable
+private fun HeroCard(book: StatsViewModel.BookStat, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))))
+                .padding(22.dp)
+        ) {
+            Column {
+                Text(
+                    "Continue Listening",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    book.title.uppercase(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    "${book.currentChapterName ?: "Chapter Unknown"} • ${(book.progress * 100).toInt()}% Complete",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                )
+                Spacer(Modifier.height(18.dp))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Text(
+                        "▶ Resume",
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsGrid(stats: StatsViewModel.StatsViewState, onStreakClick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Today
+        StatCard(
+            label = "Today",
+            value = "${stats.todayHours}h ${stats.todayMinutes}m",
+            modifier = Modifier.fillMaxWidth(),
+            isHighlight = true
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            StatCard(
+                label = "🔥 Streak",
+                value = "${stats.streakDays} Days",
+                modifier = Modifier.weight(1f),
+                onClick = onStreakClick
+            )
+            StatCard(
+                label = "Books",
+                value = stats.bookCount.toString(),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    isHighlight: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
+    Surface(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .then(
+                    if (isHighlight) Modifier.background(
+                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)))
+                    ) else Modifier
+                )
+                .padding(18.dp)
+        ) {
+            Column {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
 }
 
 @Composable
 private fun SectionTitle(title: String) {
-  Text(
-    text = title,
-    style = MaterialTheme.typography.titleMedium,
-    fontWeight = FontWeight.Bold,
-    modifier = Modifier.padding(bottom = 14.dp),
-    color = MaterialTheme.colorScheme.onSurface
-  )
+    Text(
+        text = title,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.ExtraBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(bottom = 18.dp)
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HomeListBookRow(
-  book: StatsViewModel.BookStat,
-  onBookClick: (String) -> Unit,
-  onBookLongClick: (String) -> Unit,
-  modifier: Modifier = Modifier,
+private fun BookStatRow(
+    book: StatsViewModel.BookStat,
+    badgeText: String?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
-  Surface(
-    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    shape = RoundedCornerShape(20.dp),
-    shadowElevation = 4.dp,
-    modifier = modifier
-        .clip(RoundedCornerShape(20.dp))
-        .combinedClickable(
-            onClick = { onBookClick(book.id) },
-            onLongClick = { onBookLongClick(book.id) }
-        )
-  ) {
-    Row(
-      modifier = Modifier.padding(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-      Box(
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        shadowElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
-          .size(56.dp)
-          .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center
-      ) {
-         com.starbook.features.playbackScreen.pixelplayer.components.SmartImage(
-           modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-           model = book.coverUrl,
-           contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-         )
-         if (book.coverUrl == null) {
-           Text(
-             text = book.title.take(1).uppercase(),
-             fontSize = 20.sp,
-             fontWeight = FontWeight.ExtraBold,
-             color = MaterialTheme.colorScheme.onPrimaryContainer
-           )
-         }
-      }
-
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = book.title,
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.Bold,
-          maxLines = 1,
-          overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-          color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-          text = book.author,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          fontWeight = FontWeight.Medium,
-          maxLines = 1,
-          overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(6.dp))
-        WaveProgressBar(
-          progress = book.progress,
-          color = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.fillMaxWidth().height(8.dp)
-        )
-      }
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(book.title, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${book.listenedHours}h ${book.listenedMinutes}m", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+                if (badgeText != null) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (badgeText.startsWith("★")) Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)))
+                                else Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
+                                RoundedCornerShape(50.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            badgeText,
+                            color = if (badgeText.startsWith("★")) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(book.progress)
+                        .fillMaxHeight()
+                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))), RoundedCornerShape(20.dp))
+                )
+            }
+        }
     }
-  }
 }
 
 @Composable
-private fun HoursRow(book: StatsViewModel.BookStat, maxHours: Float) {
-  val isDark = isSystemInDarkTheme()
-  Column {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.Bottom
+private fun AuthorCard(author: StatsViewModel.AuthorStat) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.width(140.dp)
     ) {
-      Text(
-        text = book.title,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.weight(1f),
-        maxLines = 1,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      val timeText = buildString {
-        if (book.listenedHours > 0) append("${book.listenedHours}h ")
-        append("${book.listenedMinutes}m")
-      }
-      Text(
-        text = timeText,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        color = if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
-      )
+        Column(
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(74.dp)
+                    .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = StarBookIcons.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                author.name,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                "${author.listenedHours}h ${author.listenedMinutes}m",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+        }
     }
-    Spacer(Modifier.height(8.dp))
-    val currentTotalHours = book.listenedHours + (book.listenedMinutes / 60f)
-    val widthFactor = (currentTotalHours / maxHours).coerceAtLeast(0.06f).coerceAtMost(1f)
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(10.dp)
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
-    ) {
-      Box(
-        modifier = Modifier
-          .fillMaxWidth(widthFactor)
-          .fillMaxHeight()
-          .background(
-            if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
-            CircleShape
-          )
-      )
-    }
-  }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AuthorChip(author: StatsViewModel.AuthorStat) {
-  val isDark = isSystemInDarkTheme()
-  Column(
-    horizontalAlignment = Alignment.CenterHorizontally,
-    modifier = Modifier.width(100.dp),
-    verticalArrangement = Arrangement.spacedBy(7.dp)
-  ) {
-    Box(
-      modifier = Modifier
-        .size(72.dp)
-        .background(
-          if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.primaryContainer,
-          RoundedCornerShape(24.dp)
-        ),
-      contentAlignment = Alignment.Center
+private fun MoreAudiobooksSheet(
+    books: List<StatsViewModel.BookStat>,
+    onBookClick: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-      Icon(
-        imageVector = StarBookIcons.Person,
-        contentDescription = null,
-        modifier = Modifier.size(48.dp),
-        tint = if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
-      )
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("More audiobooks", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape).size(36.dp)
+                ) {
+                    Icon(StarBookIcons.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 30.dp)
+            ) {
+                items(books, key = { it.id }) { book ->
+                    Surface(
+                        onClick = { onBookClick(book.id) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                Column {
+                                    Text(book.title, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(
+                                        "${book.listenedHours}h ${book.listenedMinutes}m",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(10.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(book.progress)
+                                                .fillMaxHeight()
+                                                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))), RoundedCornerShape(20.dp))
+                                        )
+                                    }
+                                }
+                            }
+
+                            val index = books.indexOf(book)
+                            if (index < 3) {
+                                val badgeText = when(index) {
+                                    0 -> "Favorite"
+                                    1 -> "Top 2"
+                                    2 -> "Top 3"
+                                    else -> ""
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (index == 0) Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)))
+                                            else Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.secondaryContainer)),
+                                            RoundedCornerShape(999.dp)
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                                ) {
+                                    Text(
+                                        badgeText,
+                                        color = if (index == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      Text(
-        text = author.name,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        maxLines = 2,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      val timeText = buildString {
-        if (author.listenedHours > 0) append("${author.listenedHours}h ")
-        append("${author.listenedMinutes}m")
-      }
-      Text(
-        text = timeText,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+}
+
+private fun getGreeting(): String {
+    val hour = LocalTime.now().hour
+    return when (hour) {
+        in 0..11 -> "Good Morning"
+        in 12..16 -> "Good Afternoon"
+        else -> "Good Evening"
     }
-  }
 }

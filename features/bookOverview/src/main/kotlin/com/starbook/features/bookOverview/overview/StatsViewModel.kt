@@ -1,41 +1,51 @@
 package com.starbook.features.bookOverview.overview
 
 import com.starbook.core.data.repo.BookRepository
+import com.starbook.core.data.repo.DailyListeningRepo
 import com.starbook.features.bookOverview.di.BookOverviewScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import com.starbook.core.common.DispatcherProvider
 import com.starbook.core.common.MainScope
 import com.starbook.features.bookOverview.overview.BookOverviewCategory
 import com.starbook.core.data.Book
+import java.time.LocalDate
+import java.time.Duration
 
 @SingleIn(BookOverviewScope::class)
 @Inject
 class StatsViewModel(
   repo: BookRepository,
+  dailyListeningRepo: DailyListeningRepo,
   dispatcherProvider: DispatcherProvider,
 ) {
 
   private val scope = MainScope(dispatcherProvider)
 
   data class StatsViewState(
+    val todayHours: Int,
+    val todayMinutes: Int,
+    val streakDays: Int,
     val totalHours: Int,
     val totalMinutes: Int,
     val bookCount: Int,
     val finishedCount: Int,
     val topByHours: List<BookStat>,
     val topAuthors: List<AuthorStat>,
-    val inProgressBooks: List<BookStat>
+    val inProgressBooks: List<BookStat>,
+    val recentBooks: List<BookStat>,
   )
 
   data class BookStat(
     val id: String,
     val title: String,
     val author: String,
+    val currentChapterName: String?,
     val listenedHours: Int,
     val listenedMinutes: Int,
     val totalHours: Float,
@@ -50,15 +60,44 @@ class StatsViewModel(
     val listenedMinutes: Int,
   )
 
-  val state: StateFlow<StatsViewState> = repo.flow().map { books ->
+  val state: StateFlow<StatsViewState> = combine(
+    repo.flow(),
+    dailyListeningRepo.allFlow()
+  ) { books, history ->
     val finished = books.filter { it.category == BookOverviewCategory.FINISHED }
     val totalListenedMs = books.sumOf { it.content.totalTimeListenedMs }
     val totalHours = (totalListenedMs / (1000 * 60 * 60)).toInt()
     val totalMinutes = ((totalListenedMs / (1000 * 60)) % 60).toInt()
 
+    val today = LocalDate.now()
+    val todayMs = history.find { it.date == today }?.listenedMs ?: 0L
+    val todayHours = (todayMs / (1000 * 60 * 60)).toInt()
+    val todayMinutes = ((todayMs / (1000 * 60)) % 60).toInt()
+
+    // Streak Logic: 5 minutes = 300,000 ms
+    val streakThreshold = 5 * 60 * 1000L
+    var streak = 0
+    val historyMap = history.associateBy { it.date }
+
+    // Check backwards from today
+    var checkDate = today
+    if ((historyMap[checkDate]?.listenedMs ?: 0L) >= streakThreshold) {
+        // Today is active
+        while (historyMap[checkDate]?.let { it.listenedMs >= streakThreshold } == true) {
+            streak++
+            checkDate = checkDate.minusDays(1)
+        }
+    } else {
+        // Today not reached threshold yet, check if yesterday was active to keep streak alive
+        checkDate = today.minusDays(1)
+        while (historyMap[checkDate]?.let { it.listenedMs >= streakThreshold } == true) {
+            streak++
+            checkDate = checkDate.minusDays(1)
+        }
+    }
+
     val topByHours = books
       .sortedByDescending { it.content.totalTimeListenedMs }
-      .take(5)
       .map { it.toBookStat() }
 
     val topAuthors = books
@@ -82,24 +121,29 @@ class StatsViewModel(
       .map { it.toBookStat() }
 
     StatsViewState(
+      todayHours = todayHours,
+      todayMinutes = todayMinutes,
+      streakDays = streak,
       totalHours = totalHours,
       totalMinutes = totalMinutes,
       bookCount = books.size,
       finishedCount = finished.size,
-      topByHours = topByHours,
+      topByHours = topByHours.take(3), // Main screen shows top 3
       topAuthors = topAuthors,
-      inProgressBooks = inProgress
+      inProgressBooks = inProgress,
+      recentBooks = topByHours // Sheet will show all or more
     )
   }.stateIn(
     scope = scope,
     started = SharingStarted.WhileSubscribed(5000),
-    initialValue = StatsViewState(0, 0, 0, 0, emptyList(), emptyList(), emptyList())
+    initialValue = StatsViewState(0, 0, 0, 0, 0, 0, 0, emptyList(), emptyList(), emptyList(), emptyList())
   )
 
   private fun Book.toBookStat() = BookStat(
     id = id.value,
     title = content.name,
     author = content.author ?: "Unknown",
+    currentChapterName = currentMark.name ?: currentChapter.name,
     listenedHours = (content.totalTimeListenedMs / (1000 * 60 * 60)).toInt(),
     listenedMinutes = ((content.totalTimeListenedMs / (1000 * 60)) % 60).toInt(),
     totalHours = duration.toFloat() / (1000 * 60 * 60),

@@ -11,6 +11,7 @@ import com.starbook.core.data.ChapterId
 import com.starbook.core.data.MarkData
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.uuid.Uuid
 
 internal class Converters {
@@ -78,5 +79,11 @@ internal class Converters {
 
   @TypeConverter
   fun fromBookmarkId(id: Bookmark.Id): String = id.value.toString()
+
+  @TypeConverter
+  fun fromLocalDate(date: LocalDate): String = date.toString()
+
+  @TypeConverter
+  fun toLocalDate(string: String): LocalDate = LocalDate.parse(string)
 }
 

@@ -11,6 +11,7 @@ import dev.zacsweers.metro.SingleIn
 import com.starbook.core.data.repo.internals.dao.BookContentDao
 import com.starbook.core.data.repo.internals.dao.BookmarkDao
 import com.starbook.core.data.repo.internals.dao.ChapterDao
+import com.starbook.core.data.repo.internals.dao.DailyListeningDao
 import com.starbook.core.data.repo.internals.dao.RecentBookSearchDao
 
 @ContributesTo(AppScope::class)
@@ -24,6 +25,9 @@ public interface PersistenceModule {
 
   @Provides
   private fun bookmarkDao(appDb: AppDb): BookmarkDao = appDb.bookmarkDao()
+
+  @Provides
+  private fun dailyListeningDao(appDb: AppDb): DailyListeningDao = appDb.dailyListeningDao()
 
   @Provides
   private fun recentBookSearchDao(appDb: AppDb): RecentBookSearchDao = appDb.recentBookSearchDao()

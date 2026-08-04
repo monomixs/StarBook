@@ -74,7 +74,7 @@ internal constructor(
     bookId: BookId,
   ) {
     val oldCover = repo.get(bookId)?.content?.cover
-    if (oldCover != null) {
+    if (oldCover != null && oldCover != cover) {
       withContext(Dispatchers.IO) {
         oldCover.delete()
       }
@@ -83,6 +83,14 @@ internal constructor(
     repo.updateBook(bookId) {
       it.copy(cover = cover)
     }
+  }
+
+  internal suspend fun newChapterCoverFile(): File {
+    val coversFolder = withContext(Dispatchers.IO) {
+      File(context.filesDir, "chapterCovers")
+        .also { it.mkdirs() }
+    }
+    return File(coversFolder, "${Uuid.random()}.png")
   }
 }
 

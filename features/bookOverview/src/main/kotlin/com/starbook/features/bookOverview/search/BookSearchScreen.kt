@@ -68,6 +68,11 @@ fun BookSearchScreen(
     onBookLongClick: (BookId) -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    if (viewState is BookSearchViewState.EmptySearch && viewState.books.isEmpty()) {
+        EmptyLibraryState()
+        return
+    }
+
     val isSearching = query.isNotBlank()
 
     Scaffold(
@@ -709,18 +714,18 @@ private fun EmptyState(query: String) {
             imageVector = StarBookIcons.Search,
             contentDescription = null,
             modifier = Modifier.size(46.dp),
-            tint = MaterialTheme.colorScheme.outlineVariant
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = buildAnnotatedString {
                 append("No matches for “")
-                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)) {
                     append(query)
                 }
                 append("”")
             },
-            style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
@@ -730,6 +735,33 @@ private fun EmptyState(query: String) {
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 6.dp, start = 24.dp, end = 24.dp)
         )
+    }
+}
+
+@Composable
+private fun EmptyLibraryState() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "No Books Found",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                "Make sure your library is not empty",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 8.dp),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

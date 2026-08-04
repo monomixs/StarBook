@@ -15,6 +15,7 @@ import com.starbook.core.data.repo.BookRepository
 import com.starbook.core.data.repo.CoverCacheManager
 import com.starbook.core.scanner.CoverSaver
 import com.starbook.core.scanner.TagWriter
+import com.starbook.core.ui.GlobalLoadingState
 import com.starbook.features.bookOverview.di.BookOverviewScope
 import com.starbook.navigation.Navigator
 import dev.zacsweers.metro.Inject
@@ -32,6 +33,7 @@ class MetadataEditorViewModel(
   private val coverSaver: CoverSaver,
   private val coverCacheManager: CoverCacheManager,
   private val tagWriter: TagWriter,
+  private val globalLoadingState: GlobalLoadingState,
   private val navigator: Navigator,
 ) : ViewModel() {
 
@@ -42,6 +44,8 @@ class MetadataEditorViewModel(
   var author by mutableStateOf("")
   var genre by mutableStateOf("")
   var coverUrl by mutableStateOf<String?>(null)
+  var isSaving by mutableStateOf(false)
+    private set
 
   private var originalContent: BookContent? = null
   private var newCoverFile: File? = null
@@ -61,6 +65,8 @@ class MetadataEditorViewModel(
 
   fun onSave() {
     val id = bookId ?: return
+    isSaving = true
+    globalLoadingState.show()
     viewModelScope.launch {
       try {
         withContext(Dispatchers.IO) {
@@ -100,6 +106,8 @@ class MetadataEditorViewModel(
       } catch (e: Exception) {
         com.starbook.core.logging.api.Logger.w(e, "Failed to save metadata")
       } finally {
+        isSaving = false
+        globalLoadingState.hide()
         navigator.goBack()
       }
     }

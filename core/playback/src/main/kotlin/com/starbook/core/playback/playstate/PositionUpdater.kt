@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.starbook.core.data.repo.BookRepository
+import com.starbook.core.data.repo.DailyListeningRepo
 import com.starbook.core.featureflag.ExperimentalPlaybackPersistenceQualifier
 import com.starbook.core.featureflag.FeatureFlag
 import com.starbook.core.logging.api.Logger
@@ -28,6 +29,7 @@ import kotlin.time.Duration.Companion.minutes
 @SingleIn(PlaybackScope::class)
 class PositionUpdater(
   private val bookRepo: BookRepository,
+  private val dailyListeningRepo: DailyListeningRepo,
   private val scope: CoroutineScope,
   private val playStateManager: PlayStateManager,
   @ExperimentalPlaybackPersistenceQualifier
@@ -121,6 +123,10 @@ class PositionUpdater(
 
     val listeningDelta = accumulatedListeningMs
     accumulatedListeningMs = 0
+
+    if (listeningDelta > 0) {
+      dailyListeningRepo.addTime(java.time.LocalDate.now(), listeningDelta)
+    }
 
     bookRepo.updateBook(bookId) { content ->
       if (chapterId in content.chapters) {

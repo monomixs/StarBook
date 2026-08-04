@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.starbook.core.common.rootGraphAs
+import com.starbook.core.ui.ChoiceCard
+import com.starbook.core.ui.SetupBackground
 import com.starbook.core.ui.icons.StarBookIcons
 import com.starbook.features.onboarding.welcome.OnboardingWelcomeProvider
 import kotlin.math.abs
@@ -54,8 +56,6 @@ fun UnifiedOnboardingScreen(initialStep: Int = 1, modifier: Modifier = Modifier)
         onResult = { uri: Uri? ->
             if (uri != null) {
                 viewModel.onFolderPicked(uri)
-                // This screen will be replaced by SelectFolderType via navigation,
-                // and SelectFolderType will eventually navigate to OnboardingCompletion (Step 4).
             }
         }
     )
@@ -64,37 +64,11 @@ fun UnifiedOnboardingScreen(initialStep: Int = 1, modifier: Modifier = Modifier)
         currentStep--
     }
 
-    val backgroundColor = if (isDark) Color(0xFF08090D) else MaterialTheme.colorScheme.background
     val surfaceColor = if (isDark) Color(0xFF232634) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     val onSurfaceColor = if (isDark) Color(0xFFECEBF4) else MaterialTheme.colorScheme.onSurface
     val onSurfaceVarColor = if (isDark) Color(0xFFAFB0C4) else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    0.0f to Color(0xFFB7C4FF).copy(alpha = if (isDark) 0.16f else 0.12f),
-                    0.6f to Color.Transparent,
-                    center = androidx.compose.ui.geometry.Offset(0.12f, 0.08f)
-                )
-            )
-            .background(
-                Brush.radialGradient(
-                    0.0f to Color(0xFFFFB68C).copy(alpha = if (isDark) 0.14f else 0.10f),
-                    0.6f to Color.Transparent,
-                    center = androidx.compose.ui.geometry.Offset(0.92f, 0.12f)
-                )
-            )
-            .background(
-                Brush.radialGradient(
-                    0.0f to Color(0xFF8FE3C4).copy(alpha = if (isDark) 0.13f else 0.08f),
-                    0.6f to Color.Transparent,
-                    center = androidx.compose.ui.geometry.Offset(0.5f, 1.02f)
-                )
-            )
-            .background(backgroundColor)
-    ) {
+    SetupBackground(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             WavebandProgress(
                 step = currentStep,
@@ -429,48 +403,5 @@ private fun BlobIcon(icon: ImageVector, accentColor: Color) {
             modifier = Modifier.size(66.dp),
             tint = Color.White
         )
-    }
-}
-
-@Composable
-private fun ChoiceCard(
-    label: String,
-    icon: ImageVector,
-    accentColor: Color,
-    containerColor: Color,
-    surfaceColor: Color,
-    onSurfaceColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .height(180.dp)
-            .clip(RoundedCornerShape(32.dp)),
-        color = surfaceColor,
-        border = BorderStroke(2.dp, Color.Transparent)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(containerColor, accentColor)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(28.dp), tint = Color.White)
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(text = label, fontWeight = FontWeight.Bold, color = onSurfaceColor)
-        }
     }
 }

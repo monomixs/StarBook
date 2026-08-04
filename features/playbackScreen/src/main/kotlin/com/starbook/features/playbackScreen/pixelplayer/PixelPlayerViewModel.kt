@@ -120,7 +120,7 @@ class PixelPlayerViewModel(
       chapterName = currentMark.name ?: currentChapter.name,
       duration = currentChapter.duration.milliseconds,
       playedTime = state.positionMs.milliseconds,
-      cover = book.content.coverUrl,
+      cover = currentChapter.coverUrl ?: book.content.coverUrl,
       skipSilence = book.content.skipSilence,
     )
   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -223,7 +223,7 @@ class PixelPlayerViewModel(
       artist = book.content.author ?: "Unknown",
       album = book.content.name,
       duration = currentMark.durationMs,
-      albumArtUriString = book.content.coverUrl,
+      albumArtUriString = currentChapter.coverUrl ?: book.content.coverUrl,
     )
 
     _stablePlayerState.value = _stablePlayerState.value.copy(
@@ -243,7 +243,7 @@ class PixelPlayerViewModel(
           artist = book.content.author ?: "Unknown",
           album = book.content.name,
           duration = it.duration,
-          albumArtUriString = book.content.coverUrl,
+          albumArtUriString = it.coverUrl ?: book.content.coverUrl,
         )
       },
     )

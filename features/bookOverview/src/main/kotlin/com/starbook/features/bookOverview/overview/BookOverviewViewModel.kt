@@ -217,6 +217,10 @@ class BookOverviewViewModel(
     selectedTab = tab
   }
 
+  fun onGoToLibrary() {
+    navigator.setRoot(Destination.BookOverview)
+  }
+
   private fun kioskModeState(): BookOverviewViewState {
     return BookOverviewViewState(
       layoutMode = BookOverviewLayoutMode.List,

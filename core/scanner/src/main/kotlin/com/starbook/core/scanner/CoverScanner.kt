@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.starbook.core.data.Book
 import com.starbook.core.data.toUri
+import com.starbook.core.data.repo.ChapterRepo
 import com.starbook.core.logging.api.Logger
 import java.io.IOException
 
@@ -15,10 +16,14 @@ internal class CoverScanner(
   private val context: Context,
   private val coverSaver: CoverSaver,
   private val coverExtractor: CoverExtractor,
+  private val chapterRepo: ChapterRepo,
 ) {
 
   suspend fun scan(books: List<Book>) {
-    books.forEach { findCoverForBook(it) }
+    books.forEach { book ->
+      findCoverForBook(book)
+      scanChaptersForCovers(book)
+    }
   }
 
   private suspend fun findCoverForBook(book: Book) {
@@ -72,6 +77,21 @@ internal class CoverScanner(
     }
 
     false
+  }
+
+  private suspend fun scanChaptersForCovers(book: Book) {
+    book.chapters.forEach { chapter ->
+      if (chapter.coverUrl == null) {
+        val chapterCoverFile = coverSaver.newChapterCoverFile()
+        val success = coverExtractor.extractCover(
+          input = chapter.id.toUri(),
+          outputFile = chapterCoverFile,
+        )
+        if (success && chapterCoverFile.exists() && chapterCoverFile.length() > 0) {
+          chapterRepo.put(chapter.copy(coverUrl = chapterCoverFile.absolutePath))
+        }
+      }
+    }
   }
 
   private suspend fun scanForEmbeddedCover(book: Book) {

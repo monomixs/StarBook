@@ -110,7 +110,8 @@ fun BookOverviewScreen(
             bottomSheetViewModel.bookSelected(BookId(bookId))
             showBottomSheet = true
         },
-        onSettingsClick = bookOverviewViewModel::onSettingsClick
+        onSettingsClick = bookOverviewViewModel::onSettingsClick,
+        onGoToLibraryClick = bookOverviewViewModel::onGoToLibrary
       )
     }
     Destination.Tab.SEARCH -> {

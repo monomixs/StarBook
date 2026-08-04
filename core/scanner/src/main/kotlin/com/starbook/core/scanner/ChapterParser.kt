@@ -18,6 +18,8 @@ internal data class ChapterParseResult(
 internal class ChapterParser(
   private val chapterRepo: ChapterRepo,
   private val mediaAnalyzer: MediaAnalyzer,
+  private val coverExtractor: CoverExtractor,
+  private val coverSaver: CoverSaver,
 ) {
 
   suspend fun parse(documentFile: CachedDocumentFile): ChapterParseResult {
@@ -34,6 +36,15 @@ internal class ChapterParser(
         ) {
           val metaData = mediaAnalyzer.analyze(file) ?: return@getOrPut null
           analyzedMetadata[id] = metaData
+
+          val chapterCoverFile = coverSaver.newChapterCoverFile()
+          val hasCover = coverExtractor.extractCover(file.uri, chapterCoverFile)
+          val coverUrl = if (hasCover && chapterCoverFile.exists() && chapterCoverFile.length() > 0) {
+            chapterCoverFile.absolutePath
+          } else {
+            null
+          }
+
           Chapter(
             id = id,
             duration = metaData.duration,
@@ -41,6 +52,7 @@ internal class ChapterParser(
             name = metaData.title ?: metaData.fileName,
             markData = metaData.chapters,
             fileSize = file.length,
+            coverUrl = coverUrl,
           )
         }
         if (chapter != null) {
